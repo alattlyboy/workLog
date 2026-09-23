@@ -1,0 +1,831 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>工作日志</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:-apple-system,"Microsoft YaHei",sans-serif;
+       background:#f4f6fb;color:#333;}
+  header{background:#fff;padding:14px 24px;display:flex;
+         justify-content:space-between;align-items:center;
+         box-shadow:0 2px 8px rgba(0,0,0,.06);
+         position:sticky;top:0;z-index:10;}
+  header h1{font-size:18px;}
+  header .actions button{margin-left:8px;padding:8px 14px;border:none;
+    border-radius:8px;cursor:pointer;font-size:13px;}
+  .btn-primary{background:#667eea;color:#fff;}
+  .btn-primary:hover{background:#5568d3;}
+  .btn-ghost{background:#eef1f8;color:#444;}
+  .btn-ghost:hover{background:#dde3f0;}
+  .view{max-width:1000px;margin:20px auto;padding:0 16px;}
+  /* 日历 */
+  .calendar{background:#fff;border-radius:14px;padding:20px;
+            box-shadow:0 4px 20px rgba(0,0,0,.05); max-width:560px; margin:0 auto;  }
+  .cal-header{display:flex;justify-content:space-between;
+              align-items:center;margin-bottom:16px;}
+  .cal-header h2{font-size:16px;}
+  .cal-header .left,.cal-header .right{display:flex;gap:8px;}
+  .cal-header button{background:#eef1f8;border:none;padding:6px 14px;
+    border-radius:8px;cursor:pointer;font-size:13px;}
+  .cal-header button.primary{background:#667eea;color:#fff;}
+  .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);
+            gap:8px;text-align:center;}
+  .cal-grid .dow{color:#888;font-size:12px;padding:6px 0;}
+  .cal-cell{position:relative;aspect-ratio:1/1;display:flex;
+    align-items:center;justify-content:center;border-radius:10px;
+    cursor:pointer;font-size:14px;background:#f7f9ff;transition:.15s;
+    flex-direction:column;}
+  .cal-cell:hover{background:#e7ecff;}
+  .cal-cell.empty{background:transparent;cursor:default;}
+  .cal-cell.today{outline:2px solid #667eea;}
+  .cal-cell.has-log{color:#fff;font-weight:600;}
+  .cal-cell .badge{position:absolute;bottom:4px;font-size:10px;opacity:.95;}
+  .cal-cell .att{position:absolute;top:3px;right:5px;font-size:10px;}
+/* 卡片 */
+.cards-title{
+  max-width:560px;
+  margin:26px auto 12px;
+  font-size:16px;
+  color:#444;
+}
+.cards{
+  max-width:560px;
+  margin:0 auto;
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(240px,1fr));
+  gap:14px;
+}
+  .card{background:#fff;border-radius:12px;padding:16px;
+    box-shadow:0 4px 14px rgba(0,0,0,.05);cursor:pointer;transition:.2s;
+    border-left:4px solid #667eea;}
+  .card:hover{transform:translateY(-2px);box-shadow:0 8px 22px rgba(0,0,0,.1);}
+  .card h3{font-size:15px;margin-bottom:6px;}
+  .card .meta{font-size:12px;color:#888;}
+  .card .bar{height:6px;border-radius:3px;background:#eee;margin-top:10px;
+             overflow:hidden;}
+  .card .bar span{display:block;height:100%;}
+  /* 编辑区 */
+  .editor{background:#fff;border-radius:14px;padding:24px;
+          box-shadow:0 4px 20px rgba(0,0,0,.05);}
+  .editor .topbar{display:flex;justify-content:space-between;
+                  align-items:center;margin-bottom:12px;}
+  .editor h2{font-size:18px;}
+  .editor label{display:block;font-size:13px;color:#666;margin:14px 0 6px;}
+  .editor input[type=text],.editor textarea,.editor select{
+    width:100%;padding:10px 12px;border:1px solid #ddd;border-radius:8px;
+    font-size:14px;font-family:inherit;}
+  .editor textarea{min-height:180px;resize:vertical;}
+  .editor input:focus,.editor textarea:focus,.editor select:focus{
+    outline:none;border-color:#667eea;}
+  .editor .row{display:flex;gap:12px;}
+  .editor .row>*{flex:1;}
+  .editor .bar-wrap{display:flex;align-items:center;gap:12px;}
+  .editor input[type=range]{flex:1;}
+  .editor .foot{margin-top:20px;display:flex;justify-content:space-between;
+                align-items:center;}
+  .editor .save{background:#667eea;color:#fff;border:none;padding:10px 22px;
+    border-radius:8px;cursor:pointer;font-size:14px;}
+  .editor .save:hover{background:#5568d3;}
+  .editor .save:disabled{background:#aaa;cursor:not-allowed;}
+  .readonly-tip{background:#fff8e1;color:#a17400;border-radius:8px;
+    padding:8px 12px;font-size:13px;margin-bottom:14px;}
+  /* 附件 */
+  .att-head{margin-top:22px;display:flex;justify-content:space-between;
+            align-items:center;}
+  .att-head h3{font-size:15px;}
+  .att-dropzone{border:2px dashed #ccd3eb;border-radius:10px;padding:14px;margin-top:8px;text-align:center;color:#888;font-size:13px;transition:0.2s;}
+  .att-dropzone.drag-over{border-color:#667eea;background:#f0f2ff;}
+  .att-list{margin-top:10px;display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;}
+  .att-item{background:#f7f9ff;border-radius:8px;padding:10px 12px;
+    display:flex;flex-direction:column;gap:6px;font-size:13px;
+    border:1px solid #e3e8f5;}
+  .att-item .fname{font-weight:600;word-break:break-all;}
+  .att-item .fsize{color:#888;font-size:11px;}
+  .att-item .ops{display:flex;gap:6px;margin-top:4px;}
+  .att-item .ops button{flex:1;border:none;background:#eef1f8;padding:5px 0;
+    border-radius:6px;cursor:pointer;font-size:12px;}
+  .att-item .ops button:hover{background:#dde3f0;}
+  .att-item .ops button.del{background:#ffe9e9;color:#c62828;}
+  .att-item .ops button.del:hover{background:#ffd4d4;}
+  /* 弹窗 */
+  .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;
+    align-items:center;justify-content:center;z-index:100;}
+  .modal-bg.show{display:flex;}
+  .modal{background:#fff;border-radius:12px;max-width:900px;width:90%;
+    max-height:85vh;display:flex;flex-direction:column;overflow:hidden;}
+  .modal header{background:#f7f9ff;padding:12px 18px;display:flex;
+    justify-content:space-between;align-items:center;
+    box-shadow:none;position:static;}
+  .modal header .t{font-size:15px;font-weight:600;word-break:break-all;}
+  .modal header button{background:#eef1f8;border:none;padding:6px 12px;
+    border-radius:8px;cursor:pointer;font-size:13px;}
+  .modal .body{padding:16px 18px;overflow:auto;flex:1;}
+  .modal pre{background:#f7f9ff;padding:12px;border-radius:8px;
+    white-space:pre-wrap;word-break:break-all;font-size:13px;
+    font-family:Consolas,Monaco,monospace;line-height:1.5;}
+  .modal img{max-width:100%;display:block;margin:auto;}
+  .toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);
+    background:#333;color:#fff;padding:10px 20px;border-radius:8px;
+    font-size:14px;opacity:0;pointer-events:none;transition:.3s;z-index:200;}
+  .toast.show{opacity:1;}
+  /* 全局拖拽遮罩 */
+  .drop-mask{position:fixed;inset:0;background:rgba(102,126,234,.15);
+    border:3px dashed #667eea;border-radius:12px;display:none;
+    align-items:center;justify-content:center;z-index:300;pointer-events:none;}
+  .drop-mask.show{display:flex;}
+  .drop-mask span{background:#667eea;color:#fff;padding:14px 30px;
+    border-radius:12px;font-size:16px;box-shadow:0 8px 24px rgba(0,0,0,.15);}
+</style>
+</head>
+<body>
+<header>
+  <h1>📔 工作日志 · {{ user }}</h1>
+  <div class="actions">
+    <span id="ipInfo" style="font-size:12px;color:#888;margin-right:6px;"></span>
+     {% if is_admin %}
+    <button class="btn-ghost" onclick="location.href='/admin'">⚙️ 用户管理</button>
+    {% endif %}
+    <button class="btn-ghost" onclick="triggerImportMd()">📥 导入 .md 日志</button>
+    <input type="file" id="importMdFile" accept=".md,.txt" style="display:none">
+    <button class="btn-ghost" onclick="location.href='/export'">📤 导出 log.md</button>
+    <button class="btn-ghost" onclick="location.href='/logout'">🚪 退出</button>
+  </div>
+</header>
+<!-- ============ 日历视图 ============ -->
+<div class="view" id="viewCalendar">
+  <div id="summaryBanner" style="max-width:560px;margin:0 auto 14px;"></div>
+  <div class="calendar">
+    <div class="cal-header">
+      <div class="left">
+        <button onclick="changeMonth(-1)">‹ 上月</button>
+        <button onclick="goToday()">今天</button>
+      </div>
+      <h2 id="monthLabel"></h2>
+      <div class="right">
+        <button class="primary" onclick="openDay(TODAY)">✍️ 写今天</button>
+        <button onclick="changeMonth(1)">下月 ›</button>
+      </div>
+    </div>
+    <div class="cal-grid" id="calGrid"></div>
+  </div>
+  <div class="cards-title">🕒 最近提交</div>
+  <div class="cards" id="cards"></div>
+<!--  <div class="cards-title">📎 最近上传</div>-->
+<!--  <div class="cards" id="uploadCards"></div>-->
+</div>
+<!-- ============ 编辑视图 ============ -->
+<div class="view" id="viewEditor" style="display:none">
+  <div class="editor">
+    <div class="topbar">
+      <h2 id="editorDate"></h2>
+      <button class="btn-ghost" onclick="backToCalendar()">← 返回日历</button>
+    </div>
+    <div id="readonlyTip" class="readonly-tip" style="display:none"></div>
+    <label>标题</label>
+    <input type="text" id="fTitle" placeholder="今天做了什么">
+    <label>提交说明</label>
+    <textarea id="fBody" placeholder="详细描述..."></textarea>
+    <div class="row">
+      <div>
+        <label>状态</label>
+        <select id="fStatus">
+          <option value="已完成">已完成</option>
+          <option value="进行中">进行中</option>
+          <option value="未开始">未开始</option>
+          <option value="处理BUG">处理BUG</option>
+          <option value="已解决BUG">已解决BUG</option>
+          <option value="发现BUG">发现BUG</option>
+          <option value="未解决BUG">未解决BUG</option>
+        </select>
+      </div>
+    </div>
+    <div>
+      <label>完成度：<span id="doneLabel">0%</span></label>
+      <div class="bar-wrap">
+        <input type="range" id="fDone" min="0" max="100" step="5" value="0"
+               oninput="document.getElementById('doneLabel').textContent=this.value+'%'">
+      </div>
+    </div>
+    <div class="foot">
+      <span style="font-size:12px;color:#888;" id="timeInfo"></span>
+      <button class="save" id="btnSave" onclick="saveDay()">💾 保存</button>
+    </div>
+    <!-- 附件区 -->
+    <div class="att-head">
+      <h3>📎 附件</h3>
+      <div>
+        <input type="file" id="attFile" multiple style="display:none">
+        <button class="btn-ghost" onclick="document.getElementById('attFile').click()">
+          ⬆️ 上传文件
+        </button>
+      </div>
+    </div>
+    <div class="att-dropzone" id="dropZone">
+      📂 将文件拖拽到此区域上传；支持Ctrl+V粘贴截图/文件（仅编辑本人日志时生效）
+    </div>
+    <div class="att-list" id="attList"></div>
+  </div>
+</div>
+<!-- ============ 弹窗（查看文件内容） ============ -->
+<div class="modal-bg" id="modalBg">
+  <div class="modal">
+    <header>
+      <div class="t" id="modalTitle">文件</div>
+      <div>
+        <button onclick="downloadModal()">⬇️ 下载</button>
+        <button onclick="closeModal()">✕ 关闭</button>
+      </div>
+    </header>
+    <div class="body" id="modalBody"></div>
+  </div>
+</div>
+<div class="drop-mask" id="dropMask"><span>📂 松开即可上传到当前日志</span></div>
+<div class="toast" id="toast"></div>
+<script>
+let TODAY = "";
+let allDays = {};
+let curYear, curMonth;
+let curDate = null;
+let curEditable = false;
+let curAttachments = [];
+let modalFile = null;
+const IS_ADMIN = !!{{ is_admin|tojson }};
+
+/* ---------- 工具 ---------- */
+function toast(msg){
+  const t=document.getElementById('toast');t.textContent=msg;
+  t.classList.add('show');setTimeout(()=>t.classList.remove('show'),1800);
+}
+function fmt(d){
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function doneColor(p){
+  if(p>=100)return '#4caf50';
+  if(p>=60) return '#8bc34a';
+  if(p>=30) return '#ff9800';
+  if(p>0)   return '#f44336';
+  return '#bbb';
+}
+function escapeHtml(s){
+  return (s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function humanSize(n){
+  if(n<1024)return n+' B';
+  if(n<1024*1024)return (n/1024).toFixed(1)+' KB';
+  return (n/1024/1024).toFixed(2)+' MB';
+}
+
+async function uploadFiles(fileList){
+  if(!curEditable){ toast('当前不可上传'); return; }
+  const fd = new FormData();
+  for(const f of fileList) fd.append('file', f);
+  const res = await fetch(`/api/day/${curDate}/upload`, {method:'POST', body: fd});
+  const data = await res.json();
+  if(data.ok){
+    toast('✅ 上传成功 '+data.saved.length+' 个文件');
+    await openDay(curDate);
+    loadUploads();
+  } else {
+    toast('❌ '+(data.msg||'上传失败'));
+  }
+}
+
+/* ---------- 拖拽&粘贴 初始化 ---------- */
+(function initDropPaste(){
+  const dropZone = document.getElementById('dropZone');
+  const dropMask = document.getElementById('dropMask');
+  let dragDepth = 0;
+  const editorVisible = ()=>document.getElementById('viewEditor').style.display!=='none';
+  const hasFiles = e => e.dataTransfer && Array.from(e.dataTransfer.types||[]).includes('Files');
+  // 拖拽：文件拖入附件区高亮
+  dropZone.addEventListener('dragover',e=>{
+    e.preventDefault();
+    dropZone.classList.add('drag-over');
+  });
+  dropZone.addEventListener('dragleave',()=>{
+    dropZone.classList.remove('drag-over');
+  });
+  dropZone.addEventListener('drop',async e=>{
+    e.preventDefault();
+    e.stopPropagation();
+    dropZone.classList.remove('drag-over');
+    if(!e.dataTransfer.files.length) return;
+    await uploadFiles(e.dataTransfer.files);
+  });
+  // 全局拖拽：任意位置拖入文件显示遮罩，松开即上传到当前日志
+  document.addEventListener('dragenter',e=>{
+    if(!editorVisible() || !curEditable || !hasFiles(e)) return;
+    e.preventDefault();
+    dragDepth++;
+    dropMask.classList.add('show');
+  });
+  document.addEventListener('dragover',e=>{
+    if(!editorVisible() || !curEditable || !hasFiles(e)) return;
+    e.preventDefault();
+  });
+  document.addEventListener('dragleave',e=>{
+    if(dragDepth<=0) return;
+    dragDepth--;
+    if(dragDepth===0) dropMask.classList.remove('show');
+  });
+  document.addEventListener('drop',async e=>{
+    e.preventDefault();
+    dragDepth = 0;
+    dropMask.classList.remove('show');
+    if(!editorVisible() || !curEditable){ toast('当前不可上传'); return; }
+    if(!e.dataTransfer.files || !e.dataTransfer.files.length) return;
+    await uploadFiles(e.dataTransfer.files);
+  });
+  // 全局粘贴事件，仅编辑器视图激活才处理
+  document.addEventListener('paste',async e=>{
+    if(document.getElementById('viewEditor').style.display==='none') return;
+    if(!curEditable) return;
+    const items = e.clipboardData.items;
+    const files = [];
+    for(let it of items){
+      if(it.kind === 'file'){
+        const f = it.getAsFile();
+        if(f) files.push(f);
+      }
+    }
+    if(files.length>0){
+      e.preventDefault();
+      await uploadFiles(files);
+    }
+  });
+})();
+
+/* ---------- 数据加载 ---------- */
+async function loadAll(){
+  const res = await fetch('/api/days');
+  const data = await res.json();
+  TODAY = data.today;
+  allDays = {};
+  data.days.forEach(d => allDays[d.date] = d);
+}
+
+/* ---------- 日历渲染 ---------- */
+function renderCalendar(){
+  const grid = document.getElementById('calGrid');
+  grid.innerHTML = '';
+  ['日','一','二','三','四','五','六'].forEach(d=>{
+    const el=document.createElement('div');
+    el.className='dow';el.textContent=d;grid.appendChild(el);
+  });
+  const first = new Date(curYear, curMonth, 1);
+  const startDow = first.getDay();
+  const daysInMonth = new Date(curYear, curMonth+1, 0).getDate();
+  for(let i=0;i<startDow;i++){
+    const el=document.createElement('div');
+    el.className='cal-cell empty';grid.appendChild(el);
+  }
+  for(let d=1;d<=daysInMonth;d++){
+    const dateStr = fmt(new Date(curYear,curMonth,d));
+    const el = document.createElement('div');
+    el.className='cal-cell';
+    el.textContent = d;
+    if(dateStr === TODAY) el.classList.add('today');
+    const info = allDays[dateStr];
+    if(info){
+      const c = doneColor(info.done);
+      el.style.background = c;
+      el.classList.add('has-log');
+      const badge = document.createElement('div');
+      badge.className='badge';badge.textContent = info.done+'%';
+      el.appendChild(badge);
+      if(info.attachments>0){
+        const att=document.createElement('div');
+        att.className='att';att.textContent='📎'+info.attachments;
+        el.appendChild(att);
+      }
+    }
+    el.onclick = ()=>openDay(dateStr);
+    grid.appendChild(el);
+  }
+  document.getElementById('monthLabel').textContent =
+    `${curYear} 年 ${curMonth+1} 月`;
+}
+
+/* ---------- 卡片渲染 ---------- */
+function renderCards(){
+  const wrap = document.getElementById('cards');
+  wrap.innerHTML = '';
+  const list = Object.values(allDays)
+    .sort((a,b)=>b.date.localeCompare(a.date)).slice(0,6);
+  if(!list.length){
+    wrap.innerHTML='<div style="color:#888;font-size:14px;">暂无提交记录</div>';
+    return;
+  }
+  list.forEach(item=>{
+    const card=document.createElement('div');
+    card.className='card';
+    card.style.borderLeftColor = doneColor(item.done);
+    card.innerHTML=`
+      <h3>${escapeHtml(item.title)||'(无标题)'}</h3>
+      <div class="meta">📅 ${item.date} · 🕒 ${escapeHtml(item.time||'')}${item.location?` · 📍 ${escapeHtml(item.location)}`:''}</div>
+      <div class="meta" style="margin-top:4px;">
+        状态：${escapeHtml(item.status||'-')} · 完成 ${item.done}%
+        ${item.attachments?' · 📎'+item.attachments:''}
+      </div>
+      <div class="bar"><span style="width:${item.done}%;background:${doneColor(item.done)}"></span></div>
+    `;
+    card.onclick=()=>openDay(item.date);
+    wrap.appendChild(card);
+  });
+}
+
+/* ---------- 最近上传卡片渲染 ---------- */
+async function loadUploads(){
+  const wrap = document.getElementById('uploadCards');
+  try{
+    const res = await fetch('/api/recent-uploads');
+    const data = await res.json();
+    if(!data.ok || !data.uploads || !data.uploads.length){
+      wrap.innerHTML = '<div style="color:#888;font-size:14px;">暂无上传记录</div>';
+      return;
+    }
+    wrap.innerHTML = '';
+    data.uploads.forEach(item=>{
+      const card=document.createElement('div');
+      card.className='card';
+      card.style.borderLeftColor = '#8bc34a';
+      card.innerHTML=`
+        <h3>${escapeHtml(item.name)}</h3>
+        <div class="meta">📅 ${item.date} · 📎 ${humanSize(item.size)}</div>
+        <div class="meta" style="margin-top:4px;">${item.location?`📍 ${escapeHtml(item.location)}`:'📍 地点未知'}</div>
+      `;
+      card.onclick=()=>openDay(item.date);
+      wrap.appendChild(card);
+    });
+  }catch(e){
+    wrap.innerHTML = '<div style="color:#888;font-size:14px;">加载失败</div>';
+  }
+}
+
+/* ---------- 打开某天 ---------- */
+async function openDay(dateStr){
+  curDate = dateStr;
+  const res = await fetch(`/api/day/${dateStr}`);
+  const data = await res.json();
+  document.getElementById('editorDate').textContent = `📅 ${dateStr}`;
+  document.getElementById('fTitle').value = data.title || '';
+  document.getElementById('fBody').value = data.body || '';
+  document.getElementById('fStatus').value = data.status || '进行中';
+  document.getElementById('fDone').value = data.done || 0;
+  document.getElementById('doneLabel').textContent = (data.done||0) + '%';
+  document.getElementById('timeInfo').textContent =
+    (data.time ? `提交时间：${data.time}` : '尚未提交') +
+    (data.location ? ` · 📍 ${data.location}` : '');
+  curEditable = !!data.editable;
+  const tip = document.getElementById('readonlyTip');
+  if(curEditable){ tip.style.display='none'; }
+  else { tip.style.display='block'; tip.textContent = '⚠️ ' + (data.reason || '当前不可编辑'); }
+  ['fTitle','fBody','fStatus','fDone'].forEach(id=>{
+    document.getElementById(id).disabled = !curEditable;
+  });
+  document.getElementById('btnSave').disabled = !curEditable;
+  curAttachments = data.attachments || [];
+  renderAttachments();
+  document.getElementById('viewCalendar').style.display='none';
+  document.getElementById('viewEditor').style.display='block';
+}
+function backToCalendar(){
+  document.getElementById('viewEditor').style.display='none';
+  document.getElementById('viewCalendar').style.display='block';
+  refresh();
+}
+
+/* ---------- 保存 ---------- */
+async function saveDay(){
+  if(!curEditable){ toast('当前不可修改'); return; }
+  const body = {
+    title: document.getElementById('fTitle').value,
+    body:  document.getElementById('fBody').value,
+    status: document.getElementById('fStatus').value,
+    done: parseInt(document.getElementById('fDone').value),
+  };
+  const res = await fetch(`/api/day/${curDate}`, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(body)
+  });
+  const data = await res.json();
+  if(data.ok){ toast('✅ 保存成功'); await loadAll(); renderCards(); await openDay(curDate); }
+  else toast('❌ '+(data.msg||'保存失败'));
+}
+
+/* ---------- 附件渲染：管理员只读时依然保留查看、下载，删除按钮仅本人curEditable才出现 ---------- */
+function renderAttachments(){
+  const wrap = document.getElementById('attList');
+  wrap.innerHTML = '';
+  if(!curAttachments.length){
+    wrap.innerHTML = '<div style="color:#888;font-size:13px;">暂无附件</div>';
+    return;
+  }
+  curAttachments.forEach(a=>{
+    const el = document.createElement('div');
+    el.className = 'att-item';
+    el.innerHTML = `
+      <div class="fname">${escapeHtml(a.name)}</div>
+      <div class="fsize">${humanSize(a.size)} · ${escapeHtml(a.mime)}</div>
+      <div class="ops">
+        <button onclick="viewAttachment('${encodeURIComponent(a.name)}')">👁️ 查看</button>
+        <button onclick="downloadAttachment('${encodeURIComponent(a.name)}')">⬇️ 下载</button>
+        ${curEditable?`<button class="del" onclick="deleteAttachment('${encodeURIComponent(a.name)}')">🗑️</button>`:''}
+      </div>
+    `;
+    wrap.appendChild(el);
+  });
+}
+
+document.getElementById('attFile').addEventListener('change', async e=>{
+  const files = e.target.files;
+  if(!files || !files.length) return;
+  await uploadFiles(files);
+  e.target.value='';
+});
+
+async function viewAttachment(name){
+  name = decodeURIComponent(name);
+  const res = await fetch(`/api/day/${curDate}/file/${encodeURIComponent(name)}/raw`);
+  const data = await res.json();
+  if(!data.ok){
+    const info = curAttachments.find(a=>a.name===name);
+    if(info && info.image){
+      openModal(name, `<img src="/api/day/${curDate}/file/${encodeURIComponent(name)}" alt="">`);
+    } else {
+      toast('❌ '+(data.msg||'无法查看'));
+    }
+    return;
+  }
+  openModal(name, `<pre>${escapeHtml(data.text)}</pre>`);
+}
+
+function downloadAttachment(name){
+  const n = decodeURIComponent(name);
+  modalFile = n;
+  location.href = `/api/day/${curDate}/file/${encodeURIComponent(n)}?download=1`;
+}
+
+async function deleteAttachment(name){
+  const n = decodeURIComponent(name);
+  if(!confirm('确定删除 '+n+' ？')) return;
+  const res = await fetch(`/api/day/${curDate}/file/${encodeURIComponent(n)}`, {method:'DELETE'});
+  const data = await res.json();
+  if(data.ok){ toast('✅ 已删除'); await openDay(curDate); }
+  else toast('❌ '+(data.msg||'删除失败'));
+}
+
+/* ---------- 弹窗 ---------- */
+function openModal(title, html){
+  modalFile = title;
+  document.getElementById('modalTitle').textContent = title;
+  document.getElementById('modalBody').innerHTML = html;
+  document.getElementById('modalBg').classList.add('show');
+}
+function closeModal(){
+  document.getElementById('modalBg').classList.remove('show');
+  document.getElementById('modalBody').innerHTML = '';
+  modalFile=null;
+}
+function downloadModal(){
+  if(!modalFile) return;
+  downloadAttachment(encodeURIComponent(modalFile));
+}
+document.getElementById('modalBg').addEventListener('click', e=>{
+  if(e.target.id==='modalBg') closeModal();
+});
+
+/* ---------- 导入 .md ---------- */
+function triggerImportMd(){ document.getElementById('importMdFile').click(); }
+document.getElementById('importMdFile').addEventListener('change', async e=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const fd = new FormData(); fd.append('file', file);
+  const res = await fetch('/api/import-md', {method:'POST', body: fd});
+  const data = await res.json();
+  if(data.ok){ toast('✅ 导入成功：'+data.date); refresh(); }
+  else toast('❌ '+(data.msg||'导入失败'));
+  e.target.value='';
+});
+
+/* ---------- 月份 ---------- */
+function changeMonth(delta){
+  curMonth += delta;
+  if(curMonth<0){curMonth=11;curYear--;}
+  if(curMonth>11){curMonth=0;curYear++;}
+  renderCalendar();
+}
+function goToday(){
+  const now = new Date();
+  curYear = now.getFullYear();
+  curMonth = now.getMonth();
+  renderCalendar();
+}
+
+/* ---------- 刷新 ---------- */
+async function refresh(){
+  await loadAll();
+  renderCalendar();
+  renderCards();
+  loadUploads();
+  loadSummaryStatus();
+}
+
+/* ---------- 公网出口IP获取与上报 ---------- */
+async function fetchPublicIp(){
+  const services = [
+    {url:'https://api.ip.sb/geoip', pick:d=>d.ip},
+    {url:'https://api64.ipify.org?format=json', pick:d=>d.ip},
+    {url:'https://ipinfo.io/json', pick:d=>d.ip},
+  ];
+
+  for(const s of services){
+    try{
+      const ctrl = new AbortController();
+      const timer = setTimeout(()=>ctrl.abort(), 5000);
+      const res = await fetch(s.url, {signal:ctrl.signal});
+      clearTimeout(timer);
+      if(!res.ok) continue;
+      const data = await res.json();
+      const ip = s.pick(data);
+      if(ip) return ip;
+    }catch(e){}
+  }
+  return null;
+}
+
+/* 浏览器侧查询 IP 归属地：优先 ip-api.com（中文、省/市/ISP/经纬度），失败回退 ipinfo.io；均失败返回 null */
+async function fetchIpDetail(ip){
+  try{
+    const ctrl = new AbortController();
+    const timer = setTimeout(()=>ctrl.abort(), 5000);
+    const res = await fetch(`https://ipapi.co/${ip}/json/?lang=zh`, {signal:ctrl.signal});
+    clearTimeout(timer);
+    if(res.ok){
+      const d = await res.json();
+      if(d && d.status==='success'){
+        let city = d.city || '';
+        if(/(街道|镇|乡|村)$/.test(city)) city = '';
+        return {
+          country: d.country || '',
+          province: d.regionName || '',
+          city: city,
+          isp: d.isp || '',
+          lat: d.lat != null ? String(d.lat) : '',
+          lon: d.lon != null ? String(d.lon) : '',
+          source: 'ip-api.com'
+        };
+      }
+    }
+  }catch(e){}
+  try{
+    const ctrl = new AbortController();
+    const timer = setTimeout(()=>ctrl.abort(), 5000);
+    const res = await fetch(`https://ipinfo.io/${ip}/json`, {signal:ctrl.signal});
+    clearTimeout(timer);
+    if(res.ok){
+      const d = await res.json();
+      if(d && (d.city || d.region || d.country)){
+        const loc = (d.loc || '').split(',');
+        return {
+          country: d.country || '',
+          province: d.region || '',
+          city: d.city || '',
+          isp: d.org || '',
+          lat: loc.length>0 ? loc[0].trim() : '',
+          lon: loc.length>1 ? loc[1].trim() : '',
+          source: 'ipinfo.io'
+        };
+      }
+    }
+  }catch(e){}
+  return null;
+}
+
+async function loadIpInfo(){
+  const el = document.getElementById('ipInfo');
+  try{
+    const pub = await fetchPublicIp();
+    if(pub){
+      const detail = await fetchIpDetail(pub);
+      const rep = await fetch('/api/report-ip', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ip: pub, detail: detail})
+      });
+      const rd = await rep.json();
+      if(rd.ok){
+        el.textContent = `🌐 ${rd.ip}（${rd.location}）`;
+        return;
+      }
+    }
+  }catch(e){}
+  try{
+    const res = await fetch('/api/my-ip');
+    const data = await res.json();
+    if(data.ok){
+      el.textContent = `🌐 ${data.ip}（${data.location}）`;
+    }
+  }catch(e){}
+}
+
+/* ---------- 周期性总结（月/季/年） ---------- */
+async function loadSummaryStatus(){
+  const wrap = document.getElementById('summaryBanner');
+  try{
+    const res = await fetch('/api/summaries/status');
+    const data = await res.json();
+    if(!data.ok || !data.periods){ wrap.innerHTML=''; return; }
+    const due = data.periods.filter(p=>p.due);
+    if(!due.length){ wrap.innerHTML=''; return; }
+    wrap.innerHTML = due.map(p=>{
+      const btn = p.generated
+        ? `<button class="btn-ghost" onclick="viewSummary('${p.period}','${p.key}')">👁️ 查看${p.label}总结</button>`
+        : `<button class="btn-primary" onclick="genSummary('${p.period}','${p.key}')">📊 生成${p.label}总结</button>`;
+      return `<div style="background:#fff8e1;border:1px solid #ffe082;border-radius:10px;padding:10px 14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:13px;color:#8d6e00;">
+        <span>⏰ ${p.label}即将结束（${p.end}），${p.generated?'请查看':'请生成并查看'}总结</span>${btn}</div>`;
+    }).join('');
+  }catch(e){ wrap.innerHTML=''; }
+}
+
+async function genSummary(period, key){
+  const payload = {period};
+  if(period==='month'){ payload.year = parseInt(key.slice(0,4)); payload.month = parseInt(key.slice(5,7)); }
+  else if(period==='quarter'){ payload.year = parseInt(key.slice(0,4)); payload.quarter = parseInt(key.slice(-1)); }
+  else { payload.year = parseInt(key); }
+  try{
+    const res = await fetch('/api/summaries/generate', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if(data.ok){ toast('✅ 已生成'+data.summary.label+'总结'); showSummary(data.summary); loadSummaryStatus(); }
+    else toast('❌ '+(data.msg||'生成失败'));
+  }catch(e){ toast('❌ 生成失败'); }
+}
+
+async function viewSummary(period, key){
+  try{
+    const res = await fetch(`/api/summaries/view?period=${encodeURIComponent(period)}&key=${encodeURIComponent(key)}`);
+    const data = await res.json();
+    if(data.ok) showSummary(data.summary);
+    else toast('❌ '+(data.msg||'总结不存在'));
+  }catch(e){ toast('❌ 加载失败'); }
+}
+
+function showSummary(s){
+  modalFile = null;
+  document.getElementById('modalTitle').textContent = `📊 ${s.label} · 总结`;
+  const prov = (s.provinces||[]).join('、') || '-';
+  const cities = (s.cities||[]).join('、') || '-';
+  let html = `
+    <div style="line-height:1.9;margin-bottom:12px;">
+      <b>周期：</b>${s.start} ~ ${s.end}<br>
+      <b>生成时间：</b>${escapeHtml(s.generated_at||'')}<br>
+      <b>提交次数：</b>${s.log_count} 条 · <b>提交人数：</b>${s.user_count} 人<br>
+      <b>提交人：</b>${escapeHtml((s.users||[]).join('、')||'-')}<br>
+      <b>涉及省份：</b>${escapeHtml(prov)}<br>
+      <b>涉及城市：</b>${escapeHtml(cities)}
+    </div>
+    <h4 style="margin:10px 0 6px;">📄 内容明细（${s.log_count} 条${s.day_truncated?'，仅展示前200条':''}）</h4>
+  `;
+  if(s.days && s.days.length){
+    html += '<table style="width:100%;border-collapse:collapse;font-size:12px;"><thead><tr>'+
+      '<th style="padding:6px;border-bottom:1px solid #eee;text-align:left;">日期</th>'+
+      '<th style="padding:6px;border-bottom:1px solid #eee;text-align:left;">提交人</th>'+
+      '<th style="padding:6px;border-bottom:1px solid #eee;text-align:left;">标题</th>'+
+      '<th style="padding:6px;border-bottom:1px solid #eee;text-align:left;">省市</th>'+
+      '<th style="padding:6px;border-bottom:1px solid #eee;text-align:left;">摘要</th>'+
+      '</tr></thead><tbody>';
+    s.days.forEach(d=>{
+      html += `<tr>
+        <td style="padding:6px;border-bottom:1px solid #f0f0f0;">${d.date}</td>
+        <td style="padding:6px;border-bottom:1px solid #f0f0f0;"><b>${escapeHtml(d.user)}</b></td>
+        <td style="padding:6px;border-bottom:1px solid #f0f0f0;">${escapeHtml(d.title)||'(无标题)'}</td>
+        <td style="padding:6px;border-bottom:1px solid #f0f0f0;">${escapeHtml(d.location)||'-'}</td>
+        <td style="padding:6px;border-bottom:1px solid #f0f0f0;color:#888;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(d.body_excerpt)||'-'}</td>
+      </tr>`;
+    });
+    html += '</tbody></table>';
+  } else {
+    html += '<div class="empty">该周期暂无日志</div>';
+  }
+  document.getElementById('modalBody').innerHTML = html;
+  document.getElementById('modalBg').classList.add('show');
+}
+
+(async function init(){
+  await loadAll();
+  const today = new Date(TODAY);
+  curYear = today.getFullYear();
+  curMonth = today.getMonth();
+  renderCalendar();
+  renderCards();
+  loadUploads();
+  loadSummaryStatus();
+  loadIpInfo();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,7 @@
+{
+  "admin": {
+    "password_hash": "scrypt:32768:8:1$GbFMprwsxBoswpfB$f7b7da8c8cd10d4d45304e91d642c1083788f54e60304092a802545efd125b92f0b646432dc741231d1f131de15c3d709b350a4762f21552015e47c3d1105c68",
+    "role": "admin",
+    "created_at": "2026-09-21 22:25:39"
+  }
+}

@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>用户管理 - 工作日志</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:-apple-system,"Microsoft YaHei",sans-serif;
+       background:#f4f6fb;color:#333;}
+  header{background:#fff;padding:14px 24px;display:flex;
+         justify-content:space-between;align-items:center;
+         box-shadow:0 2px 8px rgba(0,0,0,.06);position:sticky;top:0;z-index:10;}
+  header h1{font-size:18px;}
+  header .actions button{margin-left:8px;padding:8px 14px;border:none;
+    border-radius:8px;cursor:pointer;font-size:13px;}
+  .btn-primary{background:#667eea;color:#fff;}
+  .btn-primary:hover{background:#5568d3;}
+  .btn-ghost{background:#eef1f8;color:#444;}
+  .btn-ghost:hover{background:#dde3f0;}
+  .btn-danger{background:#ffe9e9;color:#c62828;}
+  .btn-danger:hover{background:#ffd4d4;}
+
+  .wrap{max-width:1100px;margin:20px auto;padding:0 16px;}
+  .panel{background:#fff;border-radius:14px;padding:22px;
+         box-shadow:0 4px 20px rgba(0,0,0,.05);margin-bottom:20px;}
+  .panel h2{font-size:16px;margin-bottom:16px;color:#444;
+            display:flex;justify-content:space-between;align-items:center;}
+
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th,td{padding:10px 12px;text-align:left;border-bottom:1px solid #eee;}
+  th{color:#888;font-weight:600;background:#fafbff;}
+  tr:hover td{background:#f7f9ff;}
+  td .ops button{margin-right:6px;padding:5px 10px;border:none;
+    border-radius:6px;cursor:pointer;font-size:12px;}
+  .tag{display:inline-block;padding:2px 8px;border-radius:6px;
+       font-size:11px;font-weight:600;}
+  .tag.admin{background:#e7ecff;color:#5568d3;}
+  .tag.user{background:#e8f5e9;color:#4caf50;}
+
+  .empty{color:#999;font-size:13px;padding:20px;text-align:center;}
+  .toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);
+    background:#333;color:#fff;padding:10px 20px;border-radius:8px;
+    font-size:14px;opacity:0;pointer-events:none;transition:.3s;z-index:200;}
+  .toast.show{opacity:1;}
+
+  /* 弹窗 */
+  .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;
+    align-items:center;justify-content:center;z-index:100;}
+  .modal-bg.show{display:flex;}
+  .modal{background:#fff;border-radius:12px;max-width:800px;width:90%;
+    max-height:85vh;display:flex;flex-direction:column;overflow:hidden;}
+  .modal header{background:#f7f9ff;padding:12px 18px;display:flex;
+    justify-content:space-between;align-items:center;
+    box-shadow:none;position:static;}
+  .modal .body{padding:16px 18px;overflow:auto;flex:1;font-size:13px;}
+  .modal pre{background:#f7f9ff;padding:12px;border-radius:8px;
+    white-space:pre-wrap;word-break:break-all;font-family:Consolas,Monaco,monospace;
+    line-height:1.5;}
+  /* 地点统计 / 地图 */
+  .stats-cards{display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap;}
+  .stat-card{flex:1;min-width:120px;background:#f7f9ff;border-radius:10px;
+    padding:14px 12px;text-align:center;}
+  .stat-card b{display:block;font-size:22px;color:#667eea;margin-bottom:4px;}
+  .stat-card span{font-size:12px;color:#888;}
+  .map-wrap{display:flex;gap:16px;flex-wrap:wrap;}
+  #mapChart{flex:1;min-width:320px;height:440px;background:#fafbff;
+    border-radius:12px;border:1px solid #eef1f8;}
+  .map-side{width:260px;max-height:440px;overflow:auto;font-size:13px;}
+  .map-side .prov-item{padding:8px 10px;border-radius:8px;cursor:pointer;
+    display:flex;justify-content:space-between;align-items:center;
+    border:1px solid transparent;margin-bottom:6px;}
+  .map-side .prov-item:hover{background:#f0f2ff;}
+  .map-side .prov-item.active{background:#e7ecff;border-color:#667eea;}
+  .map-side .prov-item .nm{font-weight:600;}
+  .map-side .prov-item .cnt{color:#888;font-size:12px;}
+  .map-side .prov-item .usr{color:#999;font-size:11px;width:100%;}
+  .map-tip{font-size:12px;color:#888;margin-bottom:10px;}
+  .filter-bar{display:flex;gap:10px;align-items:center;margin:14px 0 8px;}
+  .filter-bar select{padding:6px 10px;border:1px solid #ddd;border-radius:8px;
+    font-size:13px;font-family:inherit;}
+  .log-title{font-weight:600;}
+  .body-excerpt{color:#888;font-size:12px;max-width:260px;overflow:hidden;
+    text-overflow:ellipsis;white-space:nowrap;}
+  #provDetailBar{margin-top:6px;}
+  #provDetail{margin-bottom:6px;}
+  #provDetail td:first-child{white-space:nowrap;}
+  .tag.done{background:#e8f5e9;color:#4caf50;}
+  .tag.pending{background:#fff3e0;color:#e8890c;}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>⚙️ 用户管理 · {{ user }}</h1>
+  <div class="actions">
+    <span id="ipInfo" style="font-size:12px;color:#888;margin-right:6px;"></span>
+    <button class="btn-ghost" onclick="location.href='/'">← 返回日志</button>
+    <button class="btn-ghost" onclick="location.href='/logout'">🚪 退出</button>
+  </div>
+</header>
+
+<div class="wrap">
+  <!-- 用户列表 -->
+  <div class="panel">
+    <h2>👥 用户列表 <span style="font-size:12px;color:#888;" id="userCount"></span></h2>
+    <div id="userTable"></div>
+  </div>
+
+  <!-- 删除记录 -->
+  <div class="panel">
+    <h2>🗑️ 删除记录</h2>
+    <div id="delTable"></div>
+  </div>
+
+  <!-- 地点统计 / 地图 -->
+  <div class="panel">
+    <h2>🗺️ 地点统计（按省/市）</h2>
+    <div class="stats-cards" id="statsCards">
+      <div class="stat-card"><b>-</b><span>有地点日志</span></div>
+      <div class="stat-card"><b>-</b><span>参与人数</span></div>
+      <div class="stat-card"><b>-</b><span>涉及省份</span></div>
+      <div class="stat-card"><b>-</b><span>涉及城市</span></div>
+    </div>
+    <div class="map-tip" id="mapTip">加载中…</div>
+    <div class="map-wrap">
+      <div id="mapChart"></div>
+      <div class="map-side" id="provList"></div>
+    </div>
+    <div class="filter-bar" id="provDetailBar" style="display:none;">
+      <b id="provDetailTitle">省份提交明细</b>
+      <span id="provDetailMeta" style="color:#888;font-size:12px;"></span>
+      <button class="btn-ghost" style="margin-left:auto;" onclick="selectProv('')">✕ 清除筛选</button>
+    </div>
+    <div id="provDetail" style="display:none;"></div>
+    <div class="filter-bar">
+      <b>市级明细：</b>
+      <select id="provFilter" onchange="setProvFilter(this.value)">
+        <option value="">全部</option>
+      </select>
+      <span id="cityCount" style="color:#888;font-size:12px;"></span>
+    </div>
+    <div id="cityTable"></div>
+  </div>
+</div>
+
+<!-- 弹窗：查看用户日志 -->
+<div class="modal-bg" id="modalBg">
+  <div class="modal">
+    <header>
+      <div id="modalTitle" style="font-weight:600;">日志</div>
+      <div>
+        <button class="btn-ghost" id="btnDownloadCurrent" style="display:none;" onclick="downloadCurrent()">⬇️ 下载</button>
+        <button class="btn-ghost" onclick="closeModal()">✕ 关闭</button>
+      </div>
+    </header>
+    <div class="body" id="modalBody"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="/static/echarts.min.js"></script>
+
+<script>
+function toast(msg){
+  const t=document.getElementById('toast');t.textContent=msg;
+  t.classList.add('show');setTimeout(()=>t.classList.remove('show'),1800);
+}
+function escapeHtml(s){
+  return (s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function humanSize(n){
+  if(n<1024)return n+' B';
+  if(n<1024*1024)return (n/1024).toFixed(1)+' KB';
+  return (n/1024/1024).toFixed(2)+' MB';
+}
+
+/* ---------- 加载用户 ---------- */
+async function loadUsers(){
+  const res = await fetch('/api/admin/users');
+  const data = await res.json();
+  const wrap = document.getElementById('userTable');
+  if(!data.ok){ wrap.innerHTML = '<div class="empty">加载失败</div>'; return; }
+  document.getElementById('userCount').textContent = `共 ${data.users.length} 个`;
+  if(!data.users.length){ wrap.innerHTML = '<div class="empty">暂无用户</div>'; return; }
+
+  let html = `<table><thead><tr>
+    <th>用户名</th><th>角色</th><th>创建时间</th>
+    <th>日志数</th><th>附件数</th><th>占用空间</th><th>操作</th>
+  </tr></thead><tbody>`;
+  data.users.forEach(u=>{
+    html += `<tr>
+      <td><b>${escapeHtml(u.username)}</b></td>
+      <td><span class="tag ${u.role}">${u.role==='admin'?'管理员':'普通用户'}</span></td>
+      <td>${escapeHtml(u.created_at)}</td>
+      <td>${u.log_count}</td>
+      <td>${u.attachment_count}</td>
+      <td>${humanSize(u.data_size)}</td>
+      <td class="ops">
+        <button class="btn-ghost" onclick="viewUserLogs('${escapeHtml(u.username)}')">📄 查看日志</button>
+        ${u.username!=='admin'
+          ? `<button class="btn-danger" onclick="deleteUser('${escapeHtml(u.username)}')">🗑️ 删除账号</button>`
+          : `<button class="btn-ghost" disabled style="opacity:.5;cursor:not-allowed;">—</button>`}
+      </td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+}
+
+/* ---------- 查看某用户的日志 ---------- */
+async function viewUserLogs(username){
+  const res = await fetch(`/api/days?user=${encodeURIComponent(username)}`);
+  const data = await res.json();
+  document.getElementById('modalTitle').textContent = `📄 ${username} 的日志`;
+  const body = document.getElementById('modalBody');
+  if(!data.days || !data.days.length){
+    body.innerHTML = '<div class="empty">该用户暂无日志</div>';
+  } else {
+    let html = '<table><thead><tr><th>日期</th><th>标题</th><th>状态</th><th>完成度</th><th>地点</th><th>附件</th><th>操作</th></tr></thead><tbody>';
+    data.days.forEach(d=>{
+      html += `<tr>
+        <td>${d.date}</td>
+        <td>${escapeHtml(d.title)||'(无标题)'}</td>
+        <td>${escapeHtml(d.status)}</td>
+        <td>${d.done}%</td>
+        <td>${escapeHtml(d.location)||'-'}</td>
+        <td>${d.attachments}</td>
+        <td><button class="btn-ghost" onclick="viewUserDay('${username}','${d.date}')">👁️ 查看</button></td>
+      </tr>`;
+    });
+    html += '</tbody></table>';
+    body.innerHTML = html;
+  }
+  document.getElementById('modalBg').classList.add('show');
+}
+
+async function viewUserDay(username, date){
+  const res = await fetch(`/api/day/${date}?user=${encodeURIComponent(username)}`);
+  const data = await res.json();
+  window.__curUser = username;
+  window.__curDate = date;
+  window.__curAttachments = data.attachments || [];
+  window.__curFile = null;
+  document.getElementById('btnDownloadCurrent').style.display='none';
+  const body = document.getElementById('modalBody');
+  body.innerHTML = `
+    <h3 style="margin-bottom:8px;">${date} · ${escapeHtml(data.title)||'(无标题)'}</h3>
+    <div style="color:#888;font-size:12px;margin-bottom:10px;">
+      状态：${escapeHtml(data.status)} · 完成度：${data.done}% · 提交时间：${escapeHtml(data.time)||'-'}
+      ${data.location?` · 📍 地点：${escapeHtml(data.location)}`:''}
+    </div>
+    <pre>${escapeHtml(data.body)||'(无内容)'}</pre>
+    ${data.attachments && data.attachments.length
+      ? `<h4 style="margin:14px 0 6px;">📎 附件 (${data.attachments.length})</h4>
+         <table><thead><tr><th>文件名</th><th>大小</th><th>类型</th><th>操作</th></tr></thead><tbody>
+         ${data.attachments.map(a=>`<tr>
+            <td>${escapeHtml(a.name)}</td>
+            <td>${humanSize(a.size)}</td>
+            <td>${escapeHtml(a.mime)}</td>
+            <td class="ops">
+              <button class="btn-ghost" onclick="adminViewFile('${escapeHtml(username)}','${date}','${encodeURIComponent(a.name)}')">👁️ 查看</button>
+              <button class="btn-ghost" onclick="adminDownloadFile('${escapeHtml(username)}','${date}','${encodeURIComponent(a.name)}')">⬇️ 下载</button>
+            </td>
+         </tr>`).join('')}
+         </tbody></table>`
+      : ''}
+    <div style="margin-top:14px;">
+      <button class="btn-ghost" onclick="viewUserLogs('${escapeHtml(username)}')">← 返回列表</button>
+    </div>
+  `;
+  document.getElementById('modalTitle').textContent = `📋 ${username} · ${date}`;
+  document.getElementById('modalBg').classList.add('show');
+}
+
+/* ---------- 查看/下载用户附件（管理员） ---------- */
+async function adminViewFile(username, date, name){
+  name = decodeURIComponent(name);
+  document.getElementById('btnDownloadCurrent').style.display='none';
+  const res = await fetch(`/api/day/${date}/file/${encodeURIComponent(name)}/raw?user=${encodeURIComponent(username)}`);
+  const data = await res.json();
+  const info = (window.__curAttachments||[]).find(a=>a.name===name);
+  const title = document.getElementById('modalTitle');
+  const body = document.getElementById('modalBody');
+  if(data.ok){
+    title.textContent = `📄 ${name}`;
+    body.innerHTML = `<pre>${escapeHtml(data.text)}</pre>`;
+    window.__curFile = {username, date, name};
+    document.getElementById('btnDownloadCurrent').style.display='';
+  } else if(info && info.image){
+    title.textContent = `🖼️ ${name}`;
+    body.innerHTML = `<img src="/api/day/${date}/file/${encodeURIComponent(name)}?user=${encodeURIComponent(username)}" alt="" style="max-width:100%;display:block;margin:auto;">`;
+    window.__curFile = {username, date, name};
+    document.getElementById('btnDownloadCurrent').style.display='';
+  } else {
+    title.textContent = `📄 ${name}`;
+    body.innerHTML = `<div class="empty">${escapeHtml(data.msg||'无法预览，请下载查看')}</div>
+      <div style="text-align:center;margin-top:12px;">
+        <button class="btn-ghost" onclick="adminDownloadFile('${escapeHtml(username)}','${date}','${encodeURIComponent(name)}')">⬇️ 下载文件</button>
+      </div>`;
+  }
+}
+
+function adminDownloadFile(username, date, name){
+  const n = decodeURIComponent(name);
+  window.location.href = `/api/day/${date}/file/${encodeURIComponent(n)}?download=1&user=${encodeURIComponent(username)}`;
+}
+
+function downloadCurrent(){
+  if(!window.__curFile) return;
+  adminDownloadFile(window.__curFile.username, window.__curFile.date, encodeURIComponent(window.__curFile.name));
+}
+
+/* ---------- 删除用户 ---------- */
+async function deleteUser(username){
+  if(!confirm(`确定删除用户「${username}」？\n\n该操作将：\n1. 归档其所有日志和附件\n2. 记录删除日志（含IP）\n3. 删除其账号\n\n此操作不可撤销！`)) return;
+  const res = await fetch(`/api/admin/users/${encodeURIComponent(username)}`, {method:'DELETE'});
+  const data = await res.json();
+  if(data.ok){
+    toast(`✅ 已删除 ${username}（归档 ${data.log_count} 条日志）`);
+    loadUsers(); loadDeleteRecords();
+  } else {
+    toast('❌ ' + (data.msg || '删除失败'));
+  }
+}
+
+/* ---------- 删除记录 ---------- */
+async function loadDeleteRecords(){
+  const res = await fetch('/api/admin/delete-records');
+  const data = await res.json();
+  const wrap = document.getElementById('delTable');
+  if(!data.ok){ wrap.innerHTML = '<div class="empty">加载失败</div>'; return; }
+  if(!data.records.length){ wrap.innerHTML = '<div class="empty">暂无删除记录</div>'; return; }
+
+  let html = `<table><thead><tr>
+    <th>被删账号</th><th>删除时间</th><th>操作人</th><th>操作IP</th><th>操作地点</th>
+    <th>日志省市</th><th>日志数</th><th>附件数</th><th>操作</th>
+  </tr></thead><tbody>`;
+  data.records.slice().reverse().forEach(r=>{
+    html += `<tr>
+      <td><b>${escapeHtml(r.username)}</b></td>
+      <td>${escapeHtml(r.deleted_at)}</td>
+      <td>${escapeHtml(r.deleted_by||'-')}</td>
+      <td>${escapeHtml(r.ip||'-')}</td>
+      <td>${escapeHtml(r.location||r.ip_location||'-')}</td>
+      <td>${escapeHtml((r.provinces||[]).join('、')||'-')}</td>
+      <td>${r.log_count||0}</td>
+      <td>${r.attachment_count||0}</td>
+      <td class="ops"><button class="btn-ghost" onclick="viewRecord('${escapeHtml(r.id)}')">👁️ 详情</button></td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+  window.__records = data.records;
+}
+
+function viewRecord(id){
+  const r = (window.__records||[]).find(x=>x.id===id);
+  if(!r) return;
+  document.getElementById('modalTitle').textContent = `🗑️ 删除记录 · ${r.username}`;
+  let detailHtml = '';
+  if(r.ip_detail && (r.ip_detail.isp || r.ip_detail.lat || (r.ip_detail.province && r.ip_detail.city))){
+    const d = r.ip_detail;
+    const parts = [];
+    if(d.province && d.city) parts.push(`${d.province} ${d.city}${d.district?(' '+d.district):''}`);
+    if(d.isp) parts.push(d.isp);
+    if(d.lat) parts.push(`${d.lat},${d.lon}`);
+    if(parts.length) detailHtml = `<span style="color:#888;">（${escapeHtml(parts.join(' · '))}）</span>`;
+  }
+  let html = `
+    <div style="line-height:1.9;">
+      <b>被删账号：</b>${escapeHtml(r.username)}<br>
+      <b>删除时间：</b>${escapeHtml(r.deleted_at)}<br>
+      <b>操作人：</b>${escapeHtml(r.deleted_by||'-')}<br>
+      <b>操作IP：</b>${escapeHtml(r.ip||'-')}<br>
+      <b>操作地点：</b>${escapeHtml(r.location||r.ip_location||'-')}${detailHtml}<br>
+      <b>User-Agent：</b>${escapeHtml(r.user_agent||'-')}<br>
+      <b>归档路径：</b>${escapeHtml(r.archive_relative||r.archive_path||'-')}<br>
+      <b>日志数：</b>${r.log_count} · <b>附件数：</b>${r.attachment_count}
+    </div>
+    <h4 style="margin:14px 0 6px;">📄 内容摘要</h4>
+  `;
+  if(r.summary && r.summary.length){
+    html += '<table><thead><tr><th>日期</th><th>标题</th><th>状态</th><th>完成度</th><th>省市</th><th>附件</th></tr></thead><tbody>';
+    r.summary.forEach(s=>{
+      html += `<tr>
+        <td>${s.date}</td>
+        <td>${escapeHtml(s.title)||'(无标题)'}</td>
+        <td>${escapeHtml(s.status)}</td>
+        <td>${s.done}%</td>
+        <td>${escapeHtml(s.location)||'-'}</td>
+        <td>${s.attachments}</td>
+      </tr>`;
+    });
+    html += '</tbody></table>';
+  } else {
+    html += '<div class="empty">无日志内容</div>';
+  }
+  document.getElementById('modalBody').innerHTML = html;
+  document.getElementById('modalBg').classList.add('show');
+}
+
+function closeModal(){
+  document.getElementById('modalBg').classList.remove('show');
+  document.getElementById('modalBody').innerHTML = '';
+  document.getElementById('btnDownloadCurrent').style.display='none';
+  window.__curFile = null;
+}
+document.getElementById('modalBg').addEventListener('click', e=>{
+  if(e.target.id==='modalBg') closeModal();
+});
+
+/* ---------- 公网出口IP获取与上报 ---------- */
+async function fetchPublicIp(){
+  const services = [
+    {url:'https://api.ipify.org?format=json', pick:d=>d.ip},
+    {url:'https://api.ip.sb/geoip', pick:d=>d.ip},
+    {url:'https://api64.ipify.org?format=json', pick:d=>d.ip},
+    {url:'https://ipinfo.io/json', pick:d=>d.ip},
+    {url:'http://ip-api.com/json/?lang=zh-CN&fields=status,query', pick:d=>(d.status==='success'?d.query:null)}
+  ];
+  for(const s of services){
+    try{
+      const ctrl = new AbortController();
+      const timer = setTimeout(()=>ctrl.abort(), 5000);
+      const res = await fetch(s.url, {signal:ctrl.signal});
+      clearTimeout(timer);
+      if(!res.ok) continue;
+      const data = await res.json();
+      const ip = s.pick(data);
+      if(ip) return ip;
+    }catch(e){}
+  }
+  return null;
+}
+
+async function loadIpInfo(){
+  const el = document.getElementById('ipInfo');
+  try{
+    const pub = await fetchPublicIp();
+    if(pub){
+      const rep = await fetch('/api/report-ip', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ip: pub})
+      });
+      const rd = await rep.json();
+      if(rd.ok){
+        el.textContent = `🌐 ${rd.ip}（${rd.location}）`;
+        return;
+      }
+    }
+  }catch(e){}
+  try{
+    const res = await fetch('/api/my-ip');
+    const data = await res.json();
+    if(data.ok){
+      el.textContent = `🌐 ${data.ip}（${data.location}）`;
+    }
+  }catch(e){}
+}
+
+/* ---------- 地点统计 / 地图 ---------- */
+let __locStats = null;
+let __locChart = null;
+let __curProv = '';
+
+function renderStatsCards(d){
+  const cards = [
+    {v:d.located_logs||0, t:'有地点日志'},
+    {v:d.user_count||0,   t:'参与人数'},
+    {v:d.province_count||0,t:'涉及省份'},
+    {v:d.city_count||0,   t:'涉及城市'},
+  ];
+  document.getElementById('statsCards').innerHTML = cards.map(c=>
+    `<div class="stat-card"><b>${c.v}</b><span>${c.t}</span></div>`).join('');
+}
+
+function renderProvList(d){
+  const wrap = document.getElementById('provList');
+  const sel = document.getElementById('provFilter');
+  sel.innerHTML = '<option value="">全部</option>';
+  wrap.innerHTML = d.province_stats.map(p=>{
+    sel.innerHTML += `<option value="${escapeHtml(p.province)}">${escapeHtml(p.province)}（${p.count}）</option>`;
+    return `<div class="prov-item" data-p="${escapeHtml(p.province)}" onclick="selectProv('${escapeHtml(p.province)}')">
+      <div style="flex:1;">
+        <div class="nm">${escapeHtml(p.province)}</div>
+        <div class="usr">提交人：${escapeHtml(p.users.join('、'))}</div>
+      </div>
+      <div class="cnt">${p.count} 次 · ${p.user_count} 人</div>
+    </div>`;
+  }).join('');
+  highlightProv();
+}
+
+function highlightProv(){
+  document.querySelectorAll('#provList .prov-item').forEach(el=>{
+    el.classList.toggle('active', el.dataset.p === __curProv);
+  });
+}
+
+function selectProv(p){
+  __curProv = p;
+  document.getElementById('provFilter').value = p;
+  renderCityTable();
+  highlightProv();
+  renderProvDetail(p);
+}
+
+function setProvFilter(p){
+  __curProv = p || '';
+  renderCityTable();
+  highlightProv();
+  renderProvDetail(__curProv);
+}
+
+function renderProvDetail(p){
+  const bar = document.getElementById('provDetailBar');
+  const wrap = document.getElementById('provDetail');
+  if(!p || !__locStats){
+    bar.style.display = 'none';
+    wrap.style.display = 'none';
+    return;
+  }
+  const provStat = __locStats.province_stats.find(x=>x.province===p);
+  const cities = __locStats.city_stats.filter(c=>c.province===p);
+  let days = [];
+  cities.forEach(c=>{ days = days.concat(c.days || []); });
+  days.sort((a,b)=> String(b.date).localeCompare(String(a.date)));
+  const userSet = [...new Set(days.map(d=>d.user))];
+  const users = provStat && provStat.users && provStat.users.length ? provStat.users : userSet;
+  const total = provStat ? provStat.count : days.length;
+  document.getElementById('provDetailTitle').textContent = `📋 省份提交明细：${p}`;
+  document.getElementById('provDetailMeta').textContent = `提交 ${total} 次 · ${users.length} 人 · ${days.length} 条日志`;
+  bar.style.display = 'flex';
+  if(!days.length){
+    wrap.innerHTML = '<div class="empty">该省暂无提交明细</div>';
+    wrap.style.display = 'block';
+    return;
+  }
+  let html = `<table><thead><tr>
+    <th>日期</th><th>提交人</th><th>标题</th><th>状态</th><th>内容摘要</th><th>操作</th>
+  </tr></thead><tbody>`;
+  days.forEach(day=>{
+    const st = day.status || '';
+    const stTag = (st==='done'||day.done) ? '<span class="tag done">已完成</span>'
+      : st==='pending' ? '<span class="tag pending">待办</span>'
+      : (escapeHtml(st)||'-');
+    html += `<tr>
+      <td>${escapeHtml(day.date)}</td>
+      <td><b>${escapeHtml(day.user)}</b></td>
+      <td class="log-title">${escapeHtml(day.title)||'(无标题)'}</td>
+      <td>${stTag}</td>
+      <td class="body-excerpt" title="${escapeHtml(day.body_excerpt)}">${escapeHtml(day.body_excerpt)||'-'}</td>
+      <td class="ops"><button class="btn-ghost" onclick="viewUserDay('${escapeHtml(day.user)}','${escapeHtml(day.date)}')">👁️ 查看</button></td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+  wrap.style.display = 'block';
+}
+
+function renderCityTable(){
+  const wrap = document.getElementById('cityTable');
+  const cnt = document.getElementById('cityCount');
+  if(!__locStats || !__locStats.city_stats.length){
+    wrap.innerHTML = '<div class="empty">暂无带地点的日志数据</div>';
+    cnt.textContent = '';
+    return;
+  }
+  let rows = __locStats.city_stats;
+  if(__curProv) rows = rows.filter(c=>c.province===__curProv);
+  cnt.textContent = `共 ${rows.length} 个城市，${rows.reduce((s,c)=>s+c.count,0)} 条日志`;
+  if(!rows.length){ wrap.innerHTML = '<div class="empty">该省暂无城市数据</div>'; return; }
+  let html = `<table><thead><tr>
+    <th>省</th><th>市</th><th>次数</th><th>人数</th><th>提交人</th>
+    <th>日期</th><th>提交内容</th><th>摘要</th><th>操作</th>
+  </tr></thead><tbody>`;
+  rows.forEach(c=>{
+    const shown = Math.min(c.days.length, 20);
+    c.days.slice(0, shown).forEach((day, i)=>{
+      html += `<tr>
+        ${i===0?`<td rowspan="${shown}"><b>${escapeHtml(c.province)}</b></td>
+          <td rowspan="${shown}">${escapeHtml(c.city)}<br><span style="color:#888;font-size:11px;">${c.count}次/${c.user_count}人</span></td>
+          <td rowspan="${shown}">${c.count}</td><td rowspan="${shown}">${c.user_count}</td>
+          <td rowspan="${shown}">${escapeHtml(c.users.join('、'))}</td>`:''}
+        <td>${day.date}</td>
+        <td class="log-title">${escapeHtml(day.title)||'(无标题)'}</td>
+        <td class="body-excerpt" title="${escapeHtml(day.body_excerpt)}">${escapeHtml(day.body_excerpt)||'-'}</td>
+        <td class="ops"><button class="btn-ghost" onclick="viewUserDay('${escapeHtml(day.user)}','${day.date}')">👁️ 查看</button></td>
+      </tr>`;
+    });
+    if(c.days.length > shown){
+      html += `<tr><td colspan="9" style="color:#888;font-size:12px;">… 该市还有 ${c.days.length-shown} 条日志</td></tr>`;
+    }
+  });
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+}
+
+async function loadLocationStats(){
+  const tip = document.getElementById('mapTip');
+  try{
+    const res = await fetch('/api/admin/location-stats');
+    const data = await res.json();
+    if(!data.ok){ tip.textContent = '统计加载失败'; return; }
+    __locStats = data;
+    renderStatsCards(data);
+    renderProvList(data);
+    renderCityTable();
+    tip.textContent = '地图按省级聚合着色（颜色越深提交越多）；点击地图省份或右侧列表可筛选下方市级明细，「查看」可看完整提交内容。';
+    initMap(data);
+  }catch(e){
+    tip.textContent = '统计加载失败';
+  }
+}
+
+async function fetchGeoJson(){
+  const ctrl = new AbortController();
+  const timer = setTimeout(()=>ctrl.abort(), 10000);
+  try{
+    const res = await fetch('/static/china.json', {signal: ctrl.signal});
+    if(!res.ok) return null;
+    return await res.json();
+  }catch(e){
+    return null;
+  }finally{
+    clearTimeout(timer);
+  }
+}
+
+async function initMap(data){
+  const tip = document.getElementById('mapTip');
+  const el = document.getElementById('mapChart');
+  if(typeof echarts === 'undefined'){
+    tip.textContent = '⚠️ 地图组件加载失败（本地 static/echarts.min.js 缺失），下方表格统计仍可使用。';
+    el.innerHTML = '<div class="empty" style="padding-top:170px;">地图组件加载失败<br><span style="font-size:12px;">请确认 static/echarts.min.js 存在后刷新</span></div>';
+    return;
+  }
+  const geo = await fetchGeoJson();
+  if(!geo){
+    tip.textContent = '⚠️ 中国地图边界加载失败（本地 static/china.json 缺失），下方表格统计仍可使用。';
+    el.innerHTML = '<div class="empty" style="padding-top:170px;">地图边界加载失败<br><span style="font-size:12px;">请确认 static/china.json 存在后刷新</span></div>';
+    return;
+  }
+  echarts.registerMap('china', geo);
+  const maxV = Math.max(1, ...data.province_stats.map(p=>p.count));
+  __locChart = echarts.init(el);
+  __locChart.setOption({
+    tooltip: {
+      trigger: 'item',
+      formatter: p=>{
+        if(p.componentType !== 'series') return '';
+        const d = p.data || {};
+        let html = `<b>${p.name}</b><br>提交次数：${d.value||0}<br>提交人数：${d.userCount||0}<br>提交人：${d.users||'-'}`;
+        if(d.recentDays && d.recentDays.length){
+          html += '<br><span style="color:#888;">最近提交：</span><br>' +
+            d.recentDays.map(x=>`${x.date} ${escapeHtml(x.user)}：${escapeHtml(x.title)||'(无标题)'}`).join('<br>');
+        }
+        return html;
+      }
+    },
+    visualMap: {
+      min: 0, max: maxV, left: 10, bottom: 10,
+      text: ['多','少'], calculable: true,
+      inRange: {color: ['#eef2ff','#a7b3f2','#667eea','#4a2fa8']}
+    },
+    series: [{
+      type: 'map', map: 'china', roam: true, selectedMode: 'single',
+      label: {show: false, emphasis: {show: true, fontWeight: 'bold'}},
+      itemStyle: {areaColor: '#f0f3fa', borderColor: '#c7d0ea'},
+      emphasis: {label: {show: true, fontWeight: 'bold'}, itemStyle: {areaColor: '#667eea', color: '#fff'}},
+      data: data.province_stats.map(p=>({
+        name: p.province, value: p.count,
+        userCount: p.user_count, users: p.users.join('、'),
+        recentDays: p.recent_days || []
+      }))
+    }]
+  });
+  __locChart.on('click', params=>{
+    if(params.componentType === 'series' && params.name){
+      selectProv(params.name);
+    }
+  });
+  if(!data.province_stats.length){
+    tip.textContent = '暂无带地点的日志数据，地图为空。';
+  }
+}
+
+/* ---------- 初始化 ---------- */
+loadUsers();
+loadDeleteRecords();
+loadLocationStats();
+loadIpInfo();
+</script>
+</body>
+</html>
