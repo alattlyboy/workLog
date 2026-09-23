@@ -18,8 +18,8 @@ workLog
 ```
 
 ## 打包代码
-~~~ bash
+``` bash
 pyinstaller --onefile --name WorkLog --icon log.ico --collect-all flask --add-data "templates;templates" --add-data "static;static" app.py
-
+```
 >管理员账号：admin
 >管理员密码：123456
